@@ -1,2 +1,0 @@
-# potential-hipster
-Interview challenge
