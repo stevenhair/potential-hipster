@@ -93,7 +93,7 @@ def _get_links_from_string(s, domain, ignore_binary=True):
     # and 'href="<URI>"'.
     link_regex = re.compile('(?:(?:src|href)=["''])((?:(?:[a-z]+:)|'
         '(?:\.{1,2}))?\/{1,2}[\w\-\.~:\/\?#\]\[@!\$&''\(\)\*\+,;=%]+)'
-        '(?:["''])')
+        '(?:["''])', re.I)
 
     for link in re.findall(link_regex, s):
         if (_is_internal_link(link, domain) and not links.count(link) and
