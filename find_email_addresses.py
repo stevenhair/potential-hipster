@@ -25,7 +25,7 @@ def _get_emails_from_string(s):
     # just search for something formatted like an email address
 
     emails = deque()
-    email_regex = re.compile('[\w\.%\+\-]+@[\w\.\-]+\.[\w]+')
+    email_regex = re.compile('[\w\.%\+-]+@[\w\.-]+\.[\w]+')
 
     for email in re.findall(email_regex, s):
         if not emails.count(email):
@@ -92,7 +92,7 @@ def _get_links_from_string(s, domain, ignore_binary=True):
     # http://tools.ietf.org/html/rfc3986#section-2) and matches 'src="<URI>"' 
     # and 'href="<URI>"'.
     link_regex = re.compile('(?:(?:src|href)=["''])((?:(?:[a-z]+:)|'
-        '(?:\.{1,2}))?\/{1,2}[\w\-\.\~\:\/\?\#\]\[\@\!\$\&''\(\)\*\+\,\;\=\%]+)'
+        '(?:\.{1,2}))?\/{1,2}[\w\-\.~:\/\?#\]\[@!\$&''\(\)\*\+,;=%]+)'
         '(?:["''])')
 
     for link in re.findall(link_regex, s):
@@ -237,7 +237,7 @@ def main():
         description='Find email addresses on pages from a given domain.')
     parser.add_argument('--scheme', type=str, default='http',
                         help='scheme to use (default: http)')
-    parser.add_argument('-v', '--verbose', action='count', 
+    parser.add_argument('-v', '--verbose', default=0, action='count', 
                         help='increase verbosity')
     parser.add_argument('domain', type=str, help='domain on which to search')
     args = parser.parse_args()
