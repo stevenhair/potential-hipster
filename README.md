@@ -15,7 +15,7 @@ All dependencies are listed in requirements.txt and can be installed by running
 
 Alternatively, you can install them manually from PyPI:
 
- * [Chardet 2.3.0](https://pypi.python.org/pypi/chardet)
+ * [Chardet 2.3.0](https://pypi.python.org/pypi/chardet/2.3.0)
 
 ## Usage
 
