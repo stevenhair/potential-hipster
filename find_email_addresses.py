@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+"""Scrape a domain's public web pages for email addresses"""
+
 from argparse import ArgumentParser
 from collections import deque
 import re
@@ -7,16 +9,16 @@ import urllib.parse
 import chardet
 
 class DomainError(ValueError):
-    
+    """Error thrown for an invalid domain format."""
     def __init__(self, message=""):
-        super(ValueError, self).__init__(message)
+        super(DomainError, self).__init__(message)
 
 
-def _get_emails_from_string(s):
+def _get_emails_from_string(string):
     """Returns email addresses found in a string.
 
     Args:
-        s: The string to search
+        string: The string to search
 
     Returns:
         A deque object containing unique email addresses found in s."""
@@ -25,9 +27,9 @@ def _get_emails_from_string(s):
     # just search for something formatted like an email address
 
     emails = deque()
-    email_regex = re.compile('[\w\.%\+-]+@[\w\.-]+\.[\w]+')
+    email_regex = re.compile(r'[\w\.%\+-]+@[\w\.-]+\.[\w]+')
 
-    for email in re.findall(email_regex, s):
+    for email in re.findall(email_regex, string):
         if not emails.count(email):
             emails.append(email)
 
@@ -36,7 +38,7 @@ def _get_emails_from_string(s):
 def _is_internal_link(link, domain):
     """Determines whether a given URI is on the provided domain.
 
-    If the privided URI does not have a network location (domain), it is 
+    If the privided URI does not have a network location (domain), it is
     assumed to be on the local domain.
 
     Args:
@@ -46,11 +48,11 @@ def _is_internal_link(link, domain):
     Returns:
         True if the link is on domain, false otherwise."""
 
-    netloc_regex = re.compile('[\w\.+\-]*' + re.escape(domain) + '(?:\:\d+)?', 
+    netloc_regex = re.compile(r'[\w\.+\-]*' + re.escape(domain) + r'(?:\:\d+)?',
                               re.I)
 
-    o = urllib.parse.urlparse(link)
-    if not o.netloc or re.match(netloc_regex, o.netloc):
+    url = urllib.parse.urlparse(link)
+    if not url.netloc or re.match(netloc_regex, url.netloc):
         return True
     else:
         return False
@@ -58,7 +60,7 @@ def _is_internal_link(link, domain):
 def _is_binary_link(link):
     """Determines if link is to a know binary file.
 
-    This will speed up processing since we can ignore binary files, which are 
+    This will speed up processing since we can ignore binary files, which are
     usually fairly sizeable and take a while to download.
 
     Args:
@@ -69,15 +71,15 @@ def _is_binary_link(link):
 
     extensions = ['pdf', 'jpg', 'png', 'gif', 'zip', 'doc', 'docx']
 
-    o = urllib.parse.urlparse(link)
+    url = urllib.parse.urlparse(link)
 
     for ext in extensions:
-        if o.path.lower().endswith(ext.lower()):
+        if url.path.lower().endswith(ext.lower()):
             return True
 
     return False
 
-def _get_links_from_string(s, domain, ignore_binary=True):
+def _get_links_from_string(string, domain, ignore_binary=True):
     """Returns internal links found in a string.
 
     Args:
@@ -88,21 +90,22 @@ def _get_links_from_string(s, domain, ignore_binary=True):
         A deque object containing unique internal links found in s."""
 
     links = deque()
-    # This uses the RFC 3986 URI definition (see 
-    # http://tools.ietf.org/html/rfc3986#section-2) and matches 'src="<URI>"' 
+    # This uses the RFC 3986 URI definition (see
+    # http://tools.ietf.org/html/rfc3986#section-2) and matches 'src="<URI>"'
     # and 'href="<URI>"'.
-    link_regex = re.compile('(?:(?:src|href)=["''])((?:(?:[a-z]+:)|'
-        '(?:\.{1,2}))?\/{1,2}[\w\-\.~:\/\?#\]\[@!\$&''\(\)\*\+,;=%]+)'
-        '(?:["''])', re.I)
+    link_regex = re.compile(r"""(?:(?:src|href)=["'])((?:(?:[a-z]+:)|"""
+                            r'(?:\.{1,2}))?\/{1,2}'
+                            r"[\w\-\.~:\/\?#\]\[@!\$&'\(\)\*\+,;=%]+)"
+                            r"""(?:["'])""", re.I)
 
-    for link in re.findall(link_regex, s):
-        if (_is_internal_link(link, domain) and not links.count(link) and
-            not (ignore_binary and _is_binary_link(link))):
+    for link in re.findall(link_regex, string):
+        if (_is_internal_link(link, domain) and not links.count(link)
+                and not (ignore_binary and _is_binary_link(link))):
             links.append(link)
 
     return links
 
-def _decode_bytestring(s):
+def _decode_bytestring(string):
     """Decodes and returns a bytestring as a string
 
     Args:
@@ -111,11 +114,11 @@ def _decode_bytestring(s):
     Returns:
         A decoded string or an empty string if encoding cannot be determined"""
 
-    e = chardet.detect(s)
-    
+    enc = chardet.detect(string)
+
     try:
-        if e['encoding']:
-            return s.decode(e['encoding'])
+        if enc['encoding']:
+            return string.decode(enc['encoding'])
     # Ignore pages that don't decode. These are usually low confidence anyway.
     except UnicodeDecodeError:
         pass
@@ -133,29 +136,29 @@ def _assemble_url(link, domain, scheme):
     Returns:
         A properly formatted URL as a string"""
 
-    s = ''
-    o = urllib.parse.urlparse(link)
-    
-    if o.scheme:
-        s += o.scheme + '://'
+    string = ''
+    url = urllib.parse.urlparse(link)
+
+    if url.scheme:
+        string += url.scheme + '://'
     else:
-        s += scheme + '://'
+        string += scheme + '://'
 
-    if o.netloc:
-        s += o.netloc
+    if url.netloc:
+        string += url.netloc
     else:
-        s += domain
+        string += domain
 
-    s += o.path
+    string += url.path
 
-    if o.params:
-        s = s + ';' + o.params
-    if o.query:
-        s = s + '?' + o.query
-    if o.fragment:
-        s = s + '#' + o.fragment
+    if url.params:
+        string = string + ';' + url.params
+    if url.query:
+        string = string + '?' + url.query
+    if url.fragment:
+        string = string + '#' + url.fragment
 
-    return s
+    return string
 
 def _is_valid_domain(domain):
     """Determines if the provided domain is in a valid format.
@@ -169,16 +172,16 @@ def _is_valid_domain(domain):
     # For some reason, urlparse won't recognize the domain without the scheme,
     # so adding a scheme is a bit of a hack, but it works. It will even work
     # if someone enters "http://domain.com" as the domain.
-    o = urllib.parse.urlparse("http://" + domain)
-    if o.path or o.params or o.query or o.fragment or not o.netloc:
+    url = urllib.parse.urlparse("http://" + domain)
+    if url.path or url.params or url.query or url.fragment or not url.netloc:
         return False
-    
+
     return True
 
 def get_emails_in_domain(domain, scheme='http', verbosity=0):
     """Returns email addresses found in domain.
 
-    Iterates through publicly accessible pages/files found at 
+    Iterates through publicly accessible pages/files found at
     <scheme>://<domain> and collects all email addresses.
 
     Args:
@@ -194,7 +197,7 @@ def get_emails_in_domain(domain, scheme='http', verbosity=0):
 
     if not _is_valid_domain(domain):
         raise DomainError('"{}" is not a valid domain.'.format(domain))
-    
+
     emails = deque()
     pages_visited = deque()
     pages_to_visit = deque(['/'])
@@ -223,8 +226,8 @@ def get_emails_in_domain(domain, scheme='http', verbosity=0):
                     emails.append(email.lower())
 
             for link in _get_links_from_string(page_contents, domain):
-                if (not pages_to_visit.count(link) 
-                    and not pages_visited.count(link)):
+                if (not pages_to_visit.count(link)
+                        and not pages_visited.count(link)):
                     pages_to_visit.append(link)
 
     if verbosity >= 1:
@@ -233,24 +236,26 @@ def get_emails_in_domain(domain, scheme='http', verbosity=0):
     return list(emails)
 
 def main():
+    """Handles user input from the command line."""
+
     parser = ArgumentParser(
         description='Find email addresses on pages from a given domain.')
     parser.add_argument('--scheme', type=str, default='http',
                         help='scheme to use (default: http)')
-    parser.add_argument('-v', '--verbose', default=0, action='count', 
+    parser.add_argument('-v', '--verbose', default=0, action='count',
                         help='increase verbosity')
     parser.add_argument('domain', type=str, help='domain on which to search')
     args = parser.parse_args()
 
     print("Finding emails. This could take a while. Please wait...")
-    emails = get_emails_in_domain(args.domain, scheme=args.scheme, 
+    emails = get_emails_in_domain(args.domain, scheme=args.scheme,
                                   verbosity=args.verbose)
 
     if emails:
         for email in emails:
             print(email)
     else:
-        print("No emails found at {}.".format(domain))
+        print("No emails found at {}.".format(args.domain))
 
 if __name__ == '__main__':
     main()
