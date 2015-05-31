@@ -1,13 +1,15 @@
 # potential-hipster
 
-Search a domain for email addresses. Note that pages are not rendered, so any 
+Email address scraper for Python 3. Note that pages are not rendered, so any 
 data loaded via javascript will not be searched.
 
 Also note that there is currently a [bug in openssl which may prevent pages 
-loaded over https to be processed](
+from being loaded over https](
 https://bugs.launchpad.net/ubuntu/+source/openssl/+bug/965371).
 
 ## Dependencies
+
+Python 3 is required for this package. It is currently incompatible with Python 2.
 
 All dependencies are listed in requirements.txt and can be installed by running
 
@@ -27,9 +29,9 @@ Run with `-h` or `--help` for more available options.
 
 ### As a Library
 
-        >>> import find_email_addresses as fea
+        >>> import find_email_addresses as find_emails
 
-        >>> fea.get_emails_in_domain('example.com')
+        >>> find_emails.get_emails_in_domain('example.com')
         ['email1@example.com', 'email2@example.com']
 
 
