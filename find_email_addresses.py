@@ -169,16 +169,24 @@ def _is_valid_domain(domain):
     Returns:
         True if the domain is valid, false otherwise."""
 
-    # For some reason, urlparse won't recognize the domain without the scheme,
-    # so adding a scheme is a bit of a hack, but it works. It will even work
-    # if someone enters "http://domain.com" as the domain.
-    url = urllib.parse.urlparse("http://" + domain)
-    if url.path or url.params or url.query or url.fragment or not url.netloc:
-        return False
+    # Without the '//',  a domain such as 'example.com' is only a path (see
+    # http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax ). Of course, if
+    # our domain variable contains any forward slashes, it isn't valid anyway.
+    # So, first test to make sure that there are no forward slashes, and then
+    # add them in.
+    is_valid = True
 
-    return True
+    if '/' in domain:
+        is_valid = False
+    else:
+        url = urllib.parse.urlparse("//" + domain)
+        if url.path or url.params or url.query or url.fragment or not url.netloc:
+            is_valid = False
 
-def get_emails_in_domain(domain, scheme='http', verbosity=0):
+    return is_valid
+
+def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
+                         verbosity=0):
     """Returns email addresses found in domain.
 
     Iterates through publicly accessible pages/files found at
@@ -198,6 +206,28 @@ def get_emails_in_domain(domain, scheme='http', verbosity=0):
     if not _is_valid_domain(domain):
         raise DomainError('"{}" is not a valid domain.'.format(domain))
 
+    if exclude_parent:
+        domain = domain
+    else:
+        # If the exclude_parent flag is not set, we need to pull out the parent
+        # from the subdomain. Since we'll be searching the whole domain now, we
+        # might as well just replace the domain variable. See
+        # http://en.wikipedia.org/wiki/Domain_name#Technical_requirements_and_process
+        # for the domain name requirements used.
+        parent_regex = re.compile(r'(?P<parent>[a-z0-9\-]+\.[a-z0-9\-]+)$',
+                                  re.I)
+        match = re.search(parent_regex, domain)
+        # This should never not match
+        if match:
+            domain = match.group('parent')
+            if verbosity >= 1:
+                print('Searching on parent domain "{}"'.format(domain))
+        else:
+            raise DomainError(
+                'Could not separate parent domain from {}. '.format(domain) +
+                'Please report this bug to: '
+                'https://github.com/stevenhair/potential-hipster/issues')
+
     emails = deque()
     pages_visited = deque()
     pages_to_visit = deque(['/'])
@@ -211,7 +241,9 @@ def get_emails_in_domain(domain, scheme='http', verbosity=0):
             if verbosity >= 2:
                 print('Processing page "{}"...'.format(link))
             with urllib.request.urlopen(link) as page:
-                page_contents = page.read()
+                # Make sure that a redirect was not followed
+                if _is_internal_link(page.geturl(), domain):
+                    page_contents = page.read()
         except urllib.error.HTTPError:
             # Ignore errors from webpages
             if verbosity >= 2:
@@ -240,6 +272,9 @@ def main():
 
     parser = ArgumentParser(
         description='Find email addresses on pages from a given domain.')
+    parser.add_argument('--exclude-parent', default=0, action='count',
+                        help='do not search parent domain and parent '
+                        'subdomains')
     parser.add_argument('--scheme', type=str, default='http',
                         help='scheme to use (default: http)')
     parser.add_argument('-v', '--verbose', default=0, action='count',
@@ -249,6 +284,7 @@ def main():
 
     print("Finding emails. This could take a while. Please wait...")
     emails = get_emails_in_domain(args.domain, scheme=args.scheme,
+                                  exclude_parent=args.exclude_parent,
                                   verbosity=args.verbose)
 
     if emails:

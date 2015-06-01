@@ -3,9 +3,13 @@
 Email address scraper for Python 3. Note that pages are not rendered, so any 
 data loaded via javascript will not be searched.
 
-Also note that there is currently a [bug in openssl which may prevent pages 
-from being loaded over https](
-https://bugs.launchpad.net/ubuntu/+source/openssl/+bug/965371).
+International URI formats are not supported. Only ASCII URIs are 
+supported in accordance with [RFC 3986 section 2]
+(http://tools.ietf.org/html/rfc3986#section-2).
+
+Note that if a subdomain is entered, the entire parent domain and the parent's 
+subdomains will be searched unless the `--exclude-parent` flag is set or the 
+`exclude_parent` option is set to True.
 
 ## Dependencies
 
