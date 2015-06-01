@@ -208,6 +208,10 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
     if not _is_valid_domain(domain):
         raise DomainError('"{}" is not a valid domain.'.format(domain))
 
+    emails = deque()
+    pages_visited = deque()
+    pages_to_visit = deque([domain])
+
     if exclude_parent:
         domain = domain
     else:
@@ -229,10 +233,6 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
                 'Could not separate parent domain from {}. '.format(domain) +
                 'Please report this bug to: '
                 'https://github.com/stevenhair/potential-hipster/issues')
-
-    emails = deque()
-    pages_visited = deque()
-    pages_to_visit = deque(['/'])
 
     while len(pages_to_visit):
         page_contents = ''
