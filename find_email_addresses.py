@@ -172,11 +172,13 @@ def _is_valid_domain(domain):
     # Without the '//',  a domain such as 'example.com' is only a path (see
     # http://en.wikipedia.org/wiki/URI_scheme#Generic_syntax ). Of course, if
     # our domain variable contains any forward slashes, it isn't valid anyway.
-    # So, first test to make sure that there are no forward slashes, and then
-    # add them in.
+    # So, first test to make sure that there are only valid characters, then add
+    # the forward slashes for test.
     is_valid = True
+    
+    domain_regex = re.compile(r'[a-z0-9\-\.]+$', re.I)
 
-    if '/' in domain:
+    if not re.match(domain_regex, domain):
         is_valid = False
     else:
         url = urllib.parse.urlparse("//" + domain)

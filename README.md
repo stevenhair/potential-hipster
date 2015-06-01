@@ -5,7 +5,8 @@ data loaded via javascript will not be searched.
 
 International URI formats are not supported. Only ASCII URIs are 
 supported in accordance with [RFC 3986 section 2]
-(http://tools.ietf.org/html/rfc3986#section-2).
+(http://tools.ietf.org/html/rfc3986#section-2). Domains may only contain A-Z, 
+0-9, hyphens (-), and periods (.).
 
 Note that if a subdomain is entered, the entire parent domain and the parent's 
 subdomains will be searched unless the `--exclude-parent` flag is set or the 
