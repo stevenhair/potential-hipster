@@ -8,6 +8,8 @@ import urllib.request
 import urllib.parse
 import chardet
 
+import time
+
 class DomainError(ValueError):
     """Error thrown for an invalid domain format."""
     def __init__(self, message=""):
@@ -26,12 +28,15 @@ def _get_emails_from_string(string):
     # We don't need to process through the DOM to find email addresses, we can
     # just search for something formatted like an email address
 
+    #if not '@' in string:
+    #    return deque()
+
     emails = deque()
     email_regex = re.compile(r'[\w\.%\+-]+@[\w\.-]+\.[\w]+')
 
     for email in re.findall(email_regex, string):
-        if not emails.count(email):
-            emails.append(email)
+        if not email in emails:
+            emails.append(email.lower())
 
     return emails
 
@@ -47,6 +52,9 @@ def _is_internal_link(link, domain):
 
     Returns:
         True if the link is on domain, false otherwise."""
+
+    #if not domain in link:
+    #    return False
 
     netloc_regex = re.compile(r'[\w\.+\-]*' + re.escape(domain) + r'(?:\:\d+)?',
                               re.I)
@@ -74,7 +82,7 @@ def _is_binary_link(link):
     url = urllib.parse.urlparse(link)
 
     for ext in extensions:
-        if url.path.lower().endswith(ext.lower()):
+        if url.path.lower().endswith(ext):
             return True
 
     return False
@@ -89,6 +97,9 @@ def _get_links_from_string(string, domain, ignore_binary=True):
     Returns:
         A deque object containing unique internal links found in s."""
 
+    #if not 'href' in string and not 'src' in string:
+    #    return deque()
+
     links = deque()
     # This uses the RFC 3986 URI definition (see
     # http://tools.ietf.org/html/rfc3986#section-2) and matches 'src="<URI>"'
@@ -99,7 +110,7 @@ def _get_links_from_string(string, domain, ignore_binary=True):
                             r"""(?:["'])""", re.I)
 
     for link in re.findall(link_regex, string):
-        if (_is_internal_link(link, domain) and not links.count(link)
+        if (_is_internal_link(link, domain) and not link in links
                 and not (ignore_binary and _is_binary_link(link))):
             links.append(link)
 
@@ -210,7 +221,7 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
 
     emails = deque()
     pages_visited = deque()
-    pages_to_visit = deque([domain])
+    pages_to_visit = deque([_assemble_url('', domain, scheme)])
 
     if exclude_parent:
         domain = domain
@@ -234,11 +245,15 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
                 'Please report this bug to: '
                 'https://github.com/stevenhair/potential-hipster/issues')
 
+    download_time = 0
+    processing_time = 0
+
     while len(pages_to_visit):
         page_contents = ''
 
         path = pages_to_visit.popleft()
         link = _assemble_url(path, domain, scheme)
+        start = time.time()
         try:
             if verbosity >= 2:
                 print('Processing page "{}"...'.format(link))
@@ -250,22 +265,27 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
             # Ignore errors from webpages
             if verbosity >= 2:
                 print('Could not process page "{}".'.format(link))
+        download_time += (time.time() - start)
+
+        start = time.time()
         pages_visited.append(path)
 
         if page_contents:
             page_contents = _decode_bytestring(page_contents)
 
             for email in _get_emails_from_string(page_contents):
-                if not emails.count(email.lower()):
-                    emails.append(email.lower())
+                if not email in emails:
+                    emails.append(email)
 
             for link in _get_links_from_string(page_contents, domain):
-                if (not pages_to_visit.count(link)
-                        and not pages_visited.count(link)):
+                if (not link in pages_to_visit and not link in pages_visited):
                     pages_to_visit.append(link)
+        processing_time += (time.time() - start)
 
     if verbosity >= 1:
         print('Processed {} pages.'.format(len(pages_visited)))
+        print('Processing time: {} s'.format(processing_time))
+        print('Download time: {} s'.format(download_time))
 
     return list(emails)
 
@@ -296,4 +316,6 @@ def main():
         print("No emails found at {}.".format(args.domain))
 
 if __name__ == '__main__':
+    start = time.time()
     main()
+    print("Elapsed time: {} seconds".format(time.time() - start))
