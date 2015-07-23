@@ -6,6 +6,7 @@ from collections import deque
 import re
 import urllib.request
 import urllib.parse
+import ssl
 import chardet
 
 import time
@@ -247,6 +248,9 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
 
     download_time = 0
     processing_time = 0
+    # We pass this to urllib.request.urlopen to disable SSL certificate
+    # verification since the default verify method is ssl.CERT_NONE.
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
 
     while len(pages_to_visit):
         page_contents = ''
@@ -257,12 +261,14 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
         try:
             if verbosity >= 2:
                 print('Processing page "{}"...'.format(link))
-            with urllib.request.urlopen(link) as page:
+            with urllib.request.urlopen(link, context=ssl_context) as page:
                 # Make sure that a redirect was not followed
                 if _is_internal_link(page.geturl(), domain):
                     page_contents = page.read()
-        except urllib.error.HTTPError:
-            # Ignore errors from webpages
+        except (urllib.error.HTTPError, urllib.error.URLError):
+            # Ignore errors from webpages. HTTPError is a pretty generic error,
+            # URLError is another pretty generic error, but most commonly seen
+            # when the DNS name fails to resolve.
             if verbosity >= 2:
                 print('Could not process page "{}".'.format(link))
         download_time += (time.time() - start)

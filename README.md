@@ -8,6 +8,8 @@ supported in accordance with [RFC 3986 section 2]
 (http://tools.ietf.org/html/rfc3986#section-2). Domains may only contain A-Z, 
 0-9, hyphens (-), and periods (.).
 
+SSL certificate verification is disabled, so pages using the `https` protocol can be loaded regardless of whether or not they have a valid SSL certificate.
+
 Note that if a subdomain is entered, the entire parent domain and the parent's 
 subdomains will be searched unless the `--exclude-parent` flag is set or the 
 `exclude_parent` option is set to True.
