@@ -3,6 +3,7 @@
 
 from argparse import ArgumentParser
 from collections import deque
+from socket import error as SocketError
 import re
 import urllib.request
 import urllib.parse
@@ -10,6 +11,8 @@ import ssl
 import chardet
 
 import time
+
+MAX_CONNECTION_RESET_TRIES = 10
 
 class DomainError(ValueError):
     """Error thrown for an invalid domain format."""
@@ -53,9 +56,6 @@ def _is_internal_link(link, domain):
 
     Returns:
         True if the link is on domain, false otherwise."""
-
-    #if not domain in link:
-    #    return False
 
     netloc_regex = re.compile(r'[\w\.+\-]*' + re.escape(domain) + r'(?:\:\d+)?',
                               re.I)
@@ -148,29 +148,14 @@ def _assemble_url(link, domain, scheme):
     Returns:
         A properly formatted URL as a string"""
 
-    string = ''
     url = urllib.parse.urlparse(link)
 
-    if url.scheme:
-        string += url.scheme + '://'
-    else:
-        string += scheme + '://'
+    if not url.scheme:
+        url = url._replace(scheme=scheme)
+    if not url.netloc:
+        url = url._replace(netloc=domain)
 
-    if url.netloc:
-        string += url.netloc
-    else:
-        string += domain
-
-    string += url.path
-
-    if url.params:
-        string = string + ';' + url.params
-    if url.query:
-        string = string + '?' + url.query
-    if url.fragment:
-        string = string + '#' + url.fragment
-
-    return string
+    return urllib.parse.urlunparse(url)
 
 def _is_valid_domain(domain):
     """Determines if the provided domain is in a valid format.
@@ -187,7 +172,7 @@ def _is_valid_domain(domain):
     # So, first test to make sure that there are only valid characters, then add
     # the forward slashes for test.
     is_valid = True
-    
+
     domain_regex = re.compile(r'[a-z0-9\-\.]+$', re.I)
 
     if not re.match(domain_regex, domain):
@@ -224,9 +209,9 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
     pages_visited = deque()
     pages_to_visit = deque([_assemble_url('', domain, scheme)])
 
-    if exclude_parent:
-        domain = domain
-    else:
+    #if exclude_parent:
+    #    domain = domain
+    if not exclude_parent:
         # If the exclude_parent flag is not set, we need to pull out the parent
         # from the subdomain. Since we'll be searching the whole domain now, we
         # might as well just replace the domain variable. See
@@ -251,6 +236,7 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
     # We pass this to urllib.request.urlopen to disable SSL certificate
     # verification since the default verify method is ssl.CERT_NONE.
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+    connection_reset_tries = 0
 
     while len(pages_to_visit):
         page_contents = ''
@@ -271,6 +257,21 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
             # when the DNS name fails to resolve.
             if verbosity >= 2:
                 print('Could not process page "{}".'.format(link))
+        except SocketError as socket_error:
+            # Handle server issues here
+            connection_reset_tries += 1
+            if connection_reset_tries < MAX_CONNECTION_RESET_TRIES:
+                if verbosity >= 1:
+                    print('Connection reset. Trying {} more times...'.format(
+                        MAX_CONNECTION_RESET_TRIES - connection_reset_tries))
+                continue
+            else:
+                if verbosity >= 1:
+                    print('Connection reset, exceeded retry count.')
+                    break
+                else:
+                    raise socket_error
+
         download_time += (time.time() - start)
 
         start = time.time()
@@ -284,7 +285,7 @@ def get_emails_in_domain(domain, scheme='http', exclude_parent=False,
                     emails.append(email)
 
             for link in _get_links_from_string(page_contents, domain):
-                if (not link in pages_to_visit and not link in pages_visited):
+                if not link in pages_to_visit and not link in pages_visited:
                     pages_to_visit.append(link)
         processing_time += (time.time() - start)
 
@@ -322,6 +323,7 @@ def main():
         print("No emails found at {}.".format(args.domain))
 
 if __name__ == '__main__':
-    start = time.time()
+    # pylint: disable=C0103
+    start_time = time.time()
     main()
-    print("Elapsed time: {} seconds".format(time.time() - start))
+    print("Elapsed time: {} seconds".format(time.time() - start_time))
